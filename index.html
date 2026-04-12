@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <!-- Запрещаем масштабирование — приложение, не сайт -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <title>Анна Соколова — Маникюр</title>
+
+  <!-- Telegram Mini App SDK — обязательно первым -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Стили приложения -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Основной контейнер экранов -->
+  <div id="app">
+    <!-- Экраны рендерятся сюда через app.js -->
+    <div class="loader-screen">
+      <div class="loader-spinner"></div>
+    </div>
+  </div>
+
+  <!-- Нижний таб-бар — всегда в DOM, скрывается на экранах записи -->
+  <nav id="tab-bar" class="tab-bar hidden" role="navigation" aria-label="Основная навигация">
+    <button class="tab-item active" data-action="switchTab" data-params='{"tab":"home"}' aria-label="Главная">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+        <path d="M9 21V12h6v9"/>
+      </svg>
+      <span class="tab-label">Главная</span>
+    </button>
+
+    <button class="tab-item" data-action="switchTab" data-params='{"tab":"catalog"}' aria-label="Услуги">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span class="tab-label">Услуги</span>
+    </button>
+
+    <button class="tab-item" data-action="switchTab" data-params='{"tab":"appointments"}' aria-label="Мои записи">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <path d="M16 2v4M8 2v4M3 10h18"/>
+        <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+      </svg>
+      <span class="tab-label">Записи</span>
+    </button>
+  </nav>
+
+  <!-- Оффер-модалка (первый запуск) -->
+  <div id="offer-overlay" class="offer-overlay hidden" role="dialog" aria-modal="true">
+    <div class="offer-card">
+      <div class="offer-emoji">🎁</div>
+      <div class="offer-title">Скидка 15% на первую запись</div>
+      <div class="offer-subtitle">Подпишитесь на бота — получите промокод в личное сообщение</div>
+      <ul class="offer-bullets">
+        <li>Напомним о записи за день</li>
+        <li>Первыми узнаёте о свободных окошках</li>
+        <li>Эксклюзивные акции для подписчиков</li>
+      </ul>
+      <a id="offer-cta" class="offer-btn" href="#" target="_blank" rel="noopener">
+        Получить скидку 15%
+      </a>
+      <button id="offer-skip" class="offer-skip">Пропустить</button>
+    </div>
+  </div>
+
+  <!-- Данные приложения — загружается первым -->
+  <script src="js/data.js"></script>
+  <!-- Логика и экраны -->
+  <script src="js/app.js"></script>
+</body>
+</html>

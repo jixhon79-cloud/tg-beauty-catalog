@@ -1,0 +1,1574 @@
+/**
+ * style.css — все стили приложения
+ *
+ * Архитектура:
+ * 1. Переменные темы (Telegram + fallback для браузера)
+ * 2. Сброс и база
+ * 3. Лейаут приложения
+ * 4. Таб-бар
+ * 5. Компоненты (карточки, кнопки, чипы, аватары, рейтинг)
+ * 6. Экраны (главная, каталог, карточка, бронирование, подтверждение, успех)
+ * 7. Анимации
+ */
+
+/* ============================================================
+   1. ПЕРЕМЕННЫЕ ТЕМЫ
+   Telegram подставляет свои значения через --tg-theme-*
+   Значения в var(X, FALLBACK) — для работы в обычном браузере
+   ============================================================ */
+:root {
+  /* Основные цвета — берём из темы Telegram */
+  --bg:           var(--tg-theme-bg-color, #ffffff);
+  --text:         var(--tg-theme-text-color, #1c1c1e);
+  --hint:         var(--tg-theme-hint-color, #8e8e93);
+  --link:         var(--tg-theme-link-color, #c2185b);
+  --btn-bg:       var(--tg-theme-button-color, #c2185b);
+  --btn-text:     var(--tg-theme-button-text-color, #ffffff);
+  --card-bg:      var(--tg-theme-secondary-bg-color, #f2f2f7);
+
+  /* Производные — считаются на основе темы */
+  --border:       rgba(0, 0, 0, 0.08);
+  --shadow:       0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-card:  0 1px 4px rgba(0, 0, 0, 0.06);
+
+  /* Типографика — минимум 14px везде */
+  --font-xs:   14px;
+  --font-sm:   15px;
+  --font-base: 16px;
+  --font-md:   18px;
+  --font-lg:   22px;
+  --font-xl:   26px;
+
+  /* Скругления */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --radius-full: 999px;
+
+  /* Отступы */
+  --gap-xs:  4px;
+  --gap-sm:  8px;
+  --gap-md:  16px;
+  --gap-lg:  24px;
+
+  /* Высота таб-бара и нижний отступ */
+  --tab-bar-height: 68px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ============================================================
+   2. СБРОС И БАЗА
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  /* Убираем синий flash при тапе (iOS/Android) */
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* Запрещаем выделение текста — мы приложение, не страница */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Запрещаем отскок при прокрутке за границы */
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--font-base);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  /* Запрещаем горизонтальную прокрутку страницы */
+  overflow-x: hidden;
+  /* Высота = viewport Telegram, не 100vh */
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  font-size: var(--font-sm);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* Аватар мастера — фото заполняет круг */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* ============================================================
+   3. ЛЕЙАУТ ПРИЛОЖЕНИЯ
+   ============================================================ */
+
+/* Главный контейнер экранов */
+#app {
+  /* Высота вычисляется через JS из viewportStableHeight */
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* Отступ снизу под таб-бар (управляется JS) */
+  padding-bottom: 0;
+  transition: padding-bottom 0.2s;
+}
+
+/* Каждый экран */
+.screen {
+  min-height: 100vh;
+  padding-bottom: calc(var(--tab-bar-height) + var(--safe-bottom) + 16px);
+  animation: screenIn 0.22s ease;
+}
+
+/* Экраны без таб-бара (бронирование, успех) */
+.screen--flow {
+  padding-bottom: 96px; /* место под MainButton */
+}
+
+/* Лоадер при первой загрузке */
+.loader-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.loader-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--btn-bg);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ============================================================
+   4. ТАБ-БАР
+   ============================================================ */
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--tab-bar-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: stretch;
+  z-index: 100;
+  /* Лёгкий blur как в нативных приложениях */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.tab-bar.hidden {
+  display: none;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  color: var(--hint);
+  transition: color 0.15s, transform 0.1s;
+  /* Минимальная зона нажатия 44px */
+  min-height: 44px;
+}
+
+.tab-item:active {
+  transform: scale(0.92);
+}
+
+.tab-item.active {
+  color: var(--btn-bg);
+}
+
+.tab-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.tab-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ============================================================
+   5. КОМПОНЕНТЫ
+   ============================================================ */
+
+/* --- Аватар --- */
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar--sm {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* --- Рейтинг --- */
+.rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-sm);
+}
+
+.rating__stars {
+  color: #ff9800;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.rating__value {
+  font-weight: 700;
+  font-size: var(--font-sm);
+}
+
+.rating__count {
+  color: var(--hint);
+}
+
+/* --- Чип / Бейдж --- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-xs);
+  font-weight: 500;
+  background: var(--card-bg);
+  color: var(--hint);
+  white-space: nowrap;
+}
+
+.chip--accent {
+  background: color-mix(in srgb, var(--btn-bg) 12%, transparent);
+  color: var(--btn-bg);
+}
+
+.chip--success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.chip--popular {
+  background: color-mix(in srgb, #ff9800 12%, transparent);
+  color: #e65100;
+}
+
+/* --- Кнопка (вторичная, в интерфейсе) --- */
+/* Основная CTA — MainButton Telegram, она вне WebView */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  min-height: 50px;
+  transition: transform 0.1s, opacity 0.1s;
+  cursor: pointer;
+}
+
+.btn:active {
+  transform: scale(0.97);
+  opacity: 0.8;
+}
+
+.btn--primary {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  width: 100%;
+}
+
+.btn--secondary {
+  background: var(--card-bg);
+  color: var(--text);
+  width: 100%;
+}
+
+.btn--danger {
+  background: color-mix(in srgb, #f44336 10%, transparent);
+  color: #c62828;
+}
+
+.btn--sm {
+  padding: 9px 16px;
+  font-size: var(--font-xs);
+  min-height: 36px;
+}
+
+/* --- Карточка --- */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* --- Карточка услуги в каталоге --- */
+.service-card {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  padding: 14px var(--gap-md);
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  transition: transform 0.1s, opacity 0.1s;
+  cursor: pointer;
+  position: relative;
+}
+
+.service-card:active {
+  transform: scale(0.98);
+  opacity: 0.85;
+}
+
+.service-card__photo {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  overflow: hidden;
+}
+
+.service-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.service-card__name {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  margin-bottom: 3px;
+  /* Не обрезаем название — важная информация */
+}
+
+.service-card__desc {
+  font-size: var(--font-xs);
+  color: var(--hint);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.service-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.service-card__arrow {
+  color: var(--hint);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* --- Фото-заглушка --- */
+.photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+}
+
+/* --- Категории (таб-бар горизонтальный) --- */
+.categories {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 var(--gap-md) var(--gap-md);
+  /* Скрываем скроллбар — он не нужен визуально */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.categories::-webkit-scrollbar {
+  display: none;
+}
+
+.category-btn {
+  padding: 7px 16px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--hint);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 34px;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.category-btn:active {
+  transform: scale(0.95);
+}
+
+.category-btn.active {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+
+/* --- Карточка отзыва --- */
+.review-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--gap-md);
+}
+
+.review-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.review-card__meta {
+  flex: 1;
+}
+
+.review-card__name {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.review-card__date {
+  font-size: var(--font-xs);
+  color: var(--hint);
+}
+
+.review-card__text {
+  font-size: var(--font-sm);
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.review-card__badge {
+  font-size: 11px;
+  color: var(--hint);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Кнопка «Назад» (для браузера; в Telegram нативная кнопка SDK) --- */
+.app-back-bar {
+  padding: 4px 4px 0;
+}
+
+.app-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 12px 8px 6px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--link);
+  min-height: 44px;
+  min-width: 44px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.app-back-btn:active {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+/* --- Дивайдер --- */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--gap-md) 0;
+}
+
+/* --- Пустое состояние --- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px var(--gap-md);
+  text-align: center;
+  gap: var(--gap-md);
+}
+
+.empty-state__icon {
+  font-size: 56px;
+  line-height: 1;
+}
+
+.empty-state__title {
+  font-size: var(--font-md);
+  font-weight: 600;
+}
+
+.empty-state__text {
+  font-size: var(--font-sm);
+  color: var(--hint);
+  max-width: 260px;
+  line-height: 1.5;
+}
+
+/* --- Индикатор шагов --- */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--gap-md) 0 0;
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s, width 0.2s;
+}
+
+.step-dot.active {
+  width: 20px;
+  border-radius: 4px;
+  background: var(--btn-bg);
+}
+
+.step-dot.done {
+  background: color-mix(in srgb, var(--btn-bg) 40%, transparent);
+}
+
+/* ============================================================
+   6. ЭКРАНЫ
+   ============================================================ */
+
+/* --- Заголовок страницы --- */
+.page-header {
+  padding: var(--gap-md) var(--gap-md) var(--gap-sm);
+}
+
+.page-title {
+  font-size: var(--font-lg);
+  font-weight: 700;
+}
+
+.page-subtitle {
+  font-size: var(--font-sm);
+  color: var(--hint);
+  margin-top: 2px;
+}
+
+/* --- ГЛАВНАЯ --- */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--gap-lg) var(--gap-md) var(--gap-md);
+  gap: 12px;
+}
+
+.home-hero__name {
+  font-size: var(--font-lg);
+  font-weight: 700;
+}
+
+.home-hero__title {
+  font-size: var(--font-sm);
+  color: var(--hint);
+}
+
+.home-hero__tagline {
+  font-size: var(--font-sm);
+  color: var(--text);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.home-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--gap-lg);
+  padding: var(--gap-sm) var(--gap-md);
+  margin-bottom: var(--gap-sm);
+}
+
+.home-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.home-stat__value {
+  font-size: var(--font-md);
+  font-weight: 700;
+}
+
+.home-stat__label {
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.section {
+  padding: 0 var(--gap-md);
+  margin-bottom: var(--gap-lg);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--gap-sm);
+}
+
+.section-title {
+  font-size: var(--font-base);
+  font-weight: 600;
+}
+
+.section-link {
+  font-size: var(--font-xs);
+  color: var(--link);
+  font-weight: 500;
+  padding: 4px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.section-link:active {
+  opacity: 0.6;
+}
+
+/* Галерея работ на главной */
+.gallery-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.gallery-strip__item {
+  aspect-ratio: 1;
+  overflow: hidden;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.gallery-strip__item:active {
+  opacity: 0.8;
+}
+
+.gallery-strip__photo {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+}
+
+/* Адрес */
+.address-card {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--gap-md);
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.address-card:active {
+  opacity: 0.75;
+}
+
+.address-card__icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.address-card__text {
+  flex: 1;
+}
+
+.address-card__main {
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.address-card__sub {
+  font-size: var(--font-xs);
+  color: var(--hint);
+}
+
+.address-card__arrow {
+  color: var(--hint);
+}
+
+/* --- КАТАЛОГ --- */
+.catalog-list {
+  padding: 0 var(--gap-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --- КАРТОЧКА УСЛУГИ --- */
+.service-detail {
+  padding-bottom: 96px; /* место под MainButton */
+}
+
+.service-gallery {
+  position: relative;
+  background: var(--card-bg);
+  aspect-ratio: 4/3;
+  overflow: hidden;
+}
+
+.service-gallery__main {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.service-gallery__main .photo-placeholder {
+  font-size: 72px;
+}
+
+.service-gallery__thumbs {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gallery-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  transition: background 0.15s;
+}
+
+.gallery-dot.active {
+  background: #fff;
+}
+
+.service-info {
+  padding: var(--gap-md);
+}
+
+.service-info__name {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.service-info__desc {
+  font-size: var(--font-sm);
+  color: var(--hint);
+  line-height: 1.6;
+  margin-bottom: var(--gap-md);
+}
+
+.service-info__chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: var(--gap-md);
+}
+
+.service-info__next {
+  font-size: var(--font-xs);
+  color: var(--hint);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- БРОНИРОВАНИЕ --- */
+.booking-service-summary {
+  margin: var(--gap-md);
+  padding: 12px var(--gap-md);
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.booking-service-summary__emoji {
+  font-size: 24px;
+}
+
+.booking-service-summary__name {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+.booking-service-summary__meta {
+  font-size: var(--font-xs);
+  color: var(--hint);
+}
+
+.booking-section-title {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--hint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 12px;
+  padding: 0 var(--gap-md);
+  margin-bottom: 10px;
+}
+
+/* Календарь */
+.calendar {
+  padding: 0 var(--gap-md);
+  margin-bottom: var(--gap-md);
+}
+
+.calendar__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--gap-sm);
+}
+
+.calendar__month {
+  font-size: var(--font-base);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.calendar__nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 18px;
+  transition: opacity 0.1s, transform 0.1s;
+  /* Минимум 44px зоны нажатия с padding */
+  padding: 4px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.calendar__nav-btn:active {
+  opacity: 0.6;
+  transform: scale(0.9);
+}
+
+.calendar__nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.calendar__weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hint);
+  padding: 4px 0;
+}
+
+.calendar__weekday:last-child {
+  color: #f44336; /* Воскресенье — красным */
+}
+
+.calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar__day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-xs);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  min-height: 36px;
+  transition: background 0.1s, color 0.1s, transform 0.1s;
+  cursor: pointer;
+  /* Убедимся что минимум 36px для надёжного нажатия */
+}
+
+.calendar__day:active:not(:disabled) {
+  transform: scale(0.88);
+}
+
+.calendar__day--empty {
+  cursor: default;
+}
+
+.calendar__day--today {
+  font-weight: 700;
+  color: var(--btn-bg);
+}
+
+.calendar__day--past,
+.calendar__day--closed {
+  color: var(--hint);
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.calendar__day--selected {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-radius: var(--radius-sm);
+}
+
+.calendar__day--sunday {
+  color: #f44336;
+}
+
+.calendar__day--sunday.calendar__day--past,
+.calendar__day--sunday.calendar__day--closed {
+  opacity: 0.3;
+}
+
+/* Слоты времени */
+.time-slots {
+  padding: 0 var(--gap-md);
+}
+
+.time-slots__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.time-slot {
+  padding: 11px 4px;
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--text);
+  transition: background 0.1s, color 0.1s, transform 0.1s;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.time-slot:active:not(.time-slot--occupied) {
+  transform: scale(0.93);
+}
+
+.time-slot--occupied {
+  color: var(--hint);
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  pointer-events: none;
+}
+
+.time-slot--selected {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+
+/* --- ПОДТВЕРЖДЕНИЕ --- */
+.confirm-card {
+  margin: var(--gap-md);
+  background: var(--card-bg);
+  border-radius: var(--radius-xl);
+  padding: var(--gap-md);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.confirm-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.confirm-row__icon {
+  font-size: 20px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.confirm-row__label {
+  font-size: var(--font-xs);
+  color: var(--hint);
+  margin-bottom: 1px;
+}
+
+.confirm-row__value {
+  font-size: var(--font-sm);
+  font-weight: 500;
+}
+
+.confirm-row__value--price {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--btn-bg);
+}
+
+.confirm-policy {
+  margin: 0 var(--gap-md) var(--gap-md);
+  padding: 12px var(--gap-md);
+  background: color-mix(in srgb, var(--btn-bg) 8%, transparent);
+  border-radius: var(--radius-md);
+  font-size: var(--font-xs);
+  color: var(--hint);
+  line-height: 1.5;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.confirm-policy__icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.confirm-user {
+  margin: 0 var(--gap-md) var(--gap-md);
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--gap-md);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.confirm-user__icon {
+  font-size: 24px;
+}
+
+.confirm-user__label {
+  font-size: var(--font-xs);
+  color: var(--hint);
+}
+
+.confirm-user__name {
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+
+/* --- УСПЕХ --- */
+.success-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--gap-lg) var(--gap-md);
+  text-align: center;
+  gap: var(--gap-md);
+}
+
+/* SVG-анимация галочки */
+.success-icon {
+  width: 80px;
+  height: 80px;
+}
+
+.success-icon circle {
+  fill: none;
+  stroke: var(--btn-bg);
+  stroke-width: 3;
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  animation: drawCircle 0.5s ease forwards;
+}
+
+.success-icon path {
+  fill: none;
+  stroke: var(--btn-bg);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  animation: drawCheck 0.35s ease 0.45s forwards;
+}
+
+.success-title {
+  font-size: var(--font-xl);
+  font-weight: 700;
+}
+
+.success-details {
+  background: var(--card-bg);
+  border-radius: var(--radius-xl);
+  padding: var(--gap-md) var(--gap-lg);
+  width: 100%;
+  max-width: 320px;
+}
+
+.success-details__item {
+  font-size: var(--font-sm);
+  color: var(--hint);
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.success-details__item:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.success-details__item strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.success-reminder {
+  font-size: var(--font-xs);
+  color: var(--hint);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- ГАЛЕРЕЯ --- */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 0 var(--gap-md);
+}
+
+.gallery-grid__item {
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.1s, transform 0.1s;
+}
+
+.gallery-grid__item:active {
+  opacity: 0.8;
+  transform: scale(0.97);
+}
+
+.gallery-grid__photo {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+/* --- ЗАПИСИ --- */
+.appointments-section {
+  padding: 0 var(--gap-md);
+  margin-bottom: var(--gap-lg);
+}
+
+.appointments-section-title {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--hint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.appointment-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--gap-md);
+  margin-bottom: 10px;
+}
+
+.appointment-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.appointment-card__emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.appointment-card__info {
+  flex: 1;
+}
+
+.appointment-card__name {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.appointment-card__datetime {
+  font-size: var(--font-xs);
+  color: var(--hint);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.appointment-card__status {
+  flex-shrink: 0;
+}
+
+.appointment-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ============================================================
+   7. АНИМАЦИИ
+   ============================================================ */
+
+/* Появление экрана */
+@keyframes screenIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Лоадер */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Анимация круга успеха */
+@keyframes drawCircle {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Анимация галочки успеха */
+@keyframes drawCheck {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Пульсация для кнопки (когда нужно привлечь внимание) */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+/* Skeleton-лоадер */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--card-bg) 25%,
+    color-mix(in srgb, var(--card-bg) 60%, var(--bg)) 50%,
+    var(--card-bg) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-md);
+}
+
+/* ============================================================
+   ОНБОРДИНГ (первый запуск)
+   ============================================================ */
+
+.onboarding-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--gap-lg) var(--gap-md);
+  text-align: center;
+  gap: var(--gap-md);
+  animation: offerFadeIn 0.4s ease both;
+}
+
+.onboarding-emoji {
+  font-size: 64px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.onboarding-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.onboarding-subtitle {
+  font-size: var(--font-sm);
+  color: var(--hint);
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+.onboarding-features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+  margin: var(--gap-sm) 0;
+}
+
+.onboarding-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  padding: 12px var(--gap-md);
+  text-align: left;
+  font-size: var(--font-sm);
+  color: var(--text);
+}
+
+.onboarding-feature__icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.onboarding-btn {
+  width: 100%;
+  max-width: 300px;
+  min-height: 52px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-radius: var(--radius-full);
+  font-size: var(--font-base);
+  font-weight: 600;
+  transition: opacity 0.15s, transform 0.1s;
+  margin-top: var(--gap-sm);
+}
+
+.onboarding-btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+/* Кнопка «Поделиться» */
+.share-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  background: var(--card-bg);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.share-btn:active {
+  opacity: 0.7;
+}
+
+/* ============================================================
+   ОФФЕР-МОДАЛКА (первый запуск)
+   ============================================================ */
+
+.offer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gap-md);
+  animation: offerFadeIn 0.3s ease both;
+}
+
+.offer-overlay.hidden {
+  display: none;
+}
+
+@keyframes offerFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.offer-card {
+  background: var(--bg);
+  border-radius: var(--radius-xl);
+  padding: 28px var(--gap-lg);
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--gap-md);
+  animation: offerSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+}
+
+@keyframes offerSlideUp {
+  from { opacity: 0; transform: translateY(32px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.offer-emoji {
+  font-size: 56px;
+  line-height: 1;
+}
+
+.offer-title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.offer-subtitle {
+  font-size: var(--font-sm);
+  color: var(--hint);
+  line-height: 1.5;
+}
+
+.offer-bullets {
+  list-style: none;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.offer-bullets li {
+  font-size: var(--font-sm);
+  color: var(--text);
+  padding-left: 20px;
+  position: relative;
+  line-height: 1.4;
+}
+
+.offer-bullets li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #2AABEE;
+  font-weight: 700;
+}
+
+.offer-btn {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  background: #2AABEE;
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  font-size: var(--font-base);
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 48px;
+  text-align: center;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.offer-btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.offer-skip {
+  font-size: var(--font-xs);
+  color: var(--hint);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
+}
+
+.offer-skip:active {
+  color: var(--text);
+}

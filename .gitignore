@@ -1,0 +1,11 @@
+# Секреты — никогда не коммитить
+.env
+
+# Зависимости (если появится package.json)
+node_modules/
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+.vercel
