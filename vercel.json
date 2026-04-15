@@ -1,4 +1,10 @@
 {
   "name": "tg-beauty-catalog",
-  "public": true
+  "public": true,
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
