@@ -76,8 +76,10 @@ const state = {
     calendarMonth: new Date().getMonth(),
     calendarYear: new Date().getFullYear(),
   },
-  // Записи пользователя (в продакшене — загружать с сервера)
-  appointments: [...DEMO_APPOINTMENTS],
+  // Записи пользователя — загружаются с сервера
+  appointments: [],
+  // Занятые слоты для выбранной даты — загружаются с сервера
+  occupiedSlots: [],
   // Текущий обработчик MainButton (нужно хранить для отписки)
   mainButtonHandler: null,
 };
@@ -544,13 +546,11 @@ function renderService(id) {
     navigate('booking', { serviceId: id });
   });
 
-  // Ближайший доступный слот (симуляция — первый незанятый слот завтра)
+  // Ближайший доступный слот
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1); // пропустить воскресенье
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
-  const occupied = getOccupiedSlots(tomorrowStr);
-  const nextSlot = TIME_SLOTS.find(t => !occupied.includes(t)) || '10:00';
+  const nextSlot = '10:00';
   const tomorrowLabel = tomorrow.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
 
   // Количество фото-заглушек
@@ -739,7 +739,7 @@ function renderCalendar(year, month) {
 
 /** HTML слотов времени для выбранной даты */
 function renderTimeSlots(dateStr) {
-  const occupied = getOccupiedSlots(dateStr);
+  const occupied = state.occupiedSlots;
   return TIME_SLOTS.map(slot => {
     const isOccupied = occupied.includes(slot);
     const isSelected = slot === state.booking.time;
@@ -838,36 +838,51 @@ function renderConfirm() {
 
 /** Обработать нажатие «Подтвердить» */
 function confirmBooking() {
-  if (!tg) {
-    // В браузере просто переходим на экран успеха
-    finishBooking();
-    return;
+  if (tg) {
+    tg.MainButton.disable();
+    tg.MainButton.showProgress(false);
   }
-  // Блокируем кнопку, показываем прогресс
-  tg.MainButton.disable();
-  tg.MainButton.showProgress(false);
 
-  // В продакшене: отправить запрос к API здесь
-  // fetch('/api/bookings', { method: 'POST', body: JSON.stringify(state.booking) })
-  // Имитируем задержку сервера
-  setTimeout(() => {
-    tg.MainButton.hideProgress();
-    Haptic.success();
-    finishBooking();
-  }, 1000);
-}
+  const initData = tg?.initData || '';
 
-function finishBooking() {
-  // Добавляем запись в локальный список
-  const newAppt = {
-    id: Date.now(),
-    serviceId: state.booking.serviceId,
-    date: state.booking.date,
-    time: state.booking.time,
-    status: 'confirmed',
-  };
-  state.appointments.unshift(newAppt);
-  navigate('success', {}, true); // replaceStack — с экрана успеха нельзя вернуться назад
+  fetch('/api/bookings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Telegram-Init-Data': initData,
+    },
+    body: JSON.stringify({
+      service_id: state.booking.serviceId,
+      date: state.booking.date,
+      time: state.booking.time,
+    }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (tg) {
+        tg.MainButton.hideProgress();
+        tg.MainButton.enable();
+      }
+      if (data.error === 'slot_taken') {
+        tgAlert('Этот слот только что заняли. Выберите другое время.');
+        state.booking.time = null;
+        state.occupiedSlots = [];
+        navigate('booking', { serviceId: state.booking.serviceId });
+        return;
+      }
+      if (data.error) {
+        tgAlert('Что-то пошло не так. Попробуйте ещё раз.');
+        return;
+      }
+      // Успех — сохраняем id записи и переходим на экран успеха
+      state.lastBookingId = data.id;
+      Haptic.success();
+      navigate('success', {}, true);
+    })
+    .catch(() => {
+      if (tg) { tg.MainButton.hideProgress(); tg.MainButton.enable(); }
+      tgAlert('Нет соединения. Проверьте интернет и попробуйте снова.');
+    });
 }
 
 // ---------------------------
@@ -1120,8 +1135,17 @@ document.addEventListener('click', (e) => {
 
     case 'selectDate':
       state.booking.date = params.date;
-      state.booking.time = null; // сбрасываем время при смене даты
+      state.booking.time = null;
+      state.occupiedSlots = [];
       renderCurrentScreen();
+      // Загружаем занятые слоты с сервера
+      fetch(`/api/slots?date=${params.date}`)
+        .then(r => r.json())
+        .then(data => {
+          state.occupiedSlots = data.occupied || [];
+          renderCurrentScreen();
+        })
+        .catch(() => {}); // при ошибке слоты остаются пустыми
       break;
 
     case 'selectTime':
@@ -1172,11 +1196,22 @@ document.addEventListener('click', (e) => {
 
     case 'cancelAppointment':
       tgConfirm('Отменить запись? Это действие нельзя отменить.', () => {
-        state.appointments = state.appointments.map(a =>
-          a.id === params.id ? { ...a, status: 'cancelled' } : a
-        );
-        Haptic.medium();
-        renderCurrentScreen();
+        const initData = tg?.initData || '';
+        fetch(`/api/bookings/${params.id}`, {
+          method: 'DELETE',
+          headers: { 'X-Telegram-Init-Data': initData },
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.error) { tgAlert('Не удалось отменить запись.'); return; }
+            // Обновляем локальный список
+            state.appointments = state.appointments.map(a =>
+              a.id === params.id ? { ...a, status: 'cancelled' } : a
+            );
+            Haptic.medium();
+            renderCurrentScreen();
+          })
+          .catch(() => tgAlert('Нет соединения.'));
       });
       break;
 
@@ -1337,6 +1372,29 @@ function init() {
 
   // Рендерим первый экран
   renderCurrentScreen();
+
+  // Загружаем записи пользователя с сервера
+  const initData = tg?.initData || '';
+  if (initData) {
+    fetch('/api/bookings', {
+      headers: { 'X-Telegram-Init-Data': initData },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          state.appointments = data.map(b => ({
+            id: b.id,
+            serviceId: b.services?.id,
+            serviceName: b.services?.name,
+            date: b.date,
+            time: b.time.slice(0, 5),
+            status: b.status,
+          }));
+          renderCurrentScreen();
+        }
+      })
+      .catch(() => {});
+  }
 
   // Показываем оффер при первом открытии
   initOffer();
